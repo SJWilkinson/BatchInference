@@ -1,0 +1,8 @@
+{
+  "JobName": "xg-boost-churn-transform",
+  "CustomerID":{
+    "Bucket": "customer-churn-bucket",
+    "Key": "/sagemaker/DEMO-xgboost-churn/CID/test_data.csv"
+  },
+  "S3OutputPath": "s3://customer-churn-bucket/TransformJobOutputPath/Test.csv"
+}

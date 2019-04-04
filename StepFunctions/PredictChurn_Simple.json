@@ -1,0 +1,89 @@
+{
+  "StartAt": "PreProcessData",
+  "States": {
+    "PreProcessData": {
+      "Comment": "Collect data and preprocess input data.",
+      "Type": "Pass",
+      "Next": "ChurnTransform"
+    },
+    "ChurnTransform": {
+      "Comment": "Send input data to SageMaker batch transform.",
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createTransformJob",
+      "Parameters": {
+        "ModelName.$": "$.SageMakerTransform.ModelName",
+        "TransformInput": {
+          "CompressionType": "None",
+          "ContentType": "text/csv",
+          "DataSource": {
+            "S3DataSource": {
+              "S3DataType": "S3Prefix",
+              "S3Uri.$": "$.S3Input.URI"
+            }
+          }
+        },
+        "TransformOutput": {
+          "S3OutputPath.$": "$.S3Output.Path"
+        },
+        "TransformResources": {
+          "InstanceCount": 1,
+          "InstanceType": "ml.m5.large"
+        },
+        "TransformJobName.$": "$.SageMakerTransform.JobName"
+      },
+      "ResultPath": "$.SageMakerTransform.ARN",
+      "OutputPath": "$",
+      "Next": "Wait"
+    },
+    "Wait": {
+      "Comment": "Wait for transform job to complete.",
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next":"QueryTransformJobStatus",
+      "OutputPath": "$"
+    },
+    "QueryTransformJobStatus": {
+      "Comment": "Trigger Lambda to check status of transform job.",
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-west-2:883624334343:function:query_transform_status",
+      "InputPath": "$.SageMakerTransform.ARN",
+      "ResultPath": "$.QueryResponse",
+      "OutputPath": "$",
+      "Next": "TransformStatusChoice"
+    },
+    "TransformStatusChoice": {
+      "Comment": "Choose next state based on transform status.",
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.QueryResponse.transformResponse",
+          "StringEquals": "Completed",
+          "Next": "PostProcess"
+        },
+        {
+          "Variable": "$.QueryResponse.transformResponse",
+          "StringEquals": "InProgress",
+          "Next": "Wait"
+        }
+      ],
+      "OutputPath": "$",
+      "Default": "ChoiceFail"
+    },
+    "ChoiceFail":{
+      "Comment": "Alert SNS topic that transform failed.",
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn.$": "$.SNS.TopicARN",
+        "Subject.$": "$.SNS.Subject",
+        "Message.$": "$.SNS.Message"
+        },
+      "End": true
+    },
+    "PostProcess": {
+      "Comment": "Act on inference results.",
+      "Type": "Pass",
+      "End": true
+    }
+  }
+}

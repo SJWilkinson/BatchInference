@@ -1,0 +1,139 @@
+{
+  "StartAt": "PreProcessData",
+  "States": {
+    "PreProcessData": {
+      "Type": "Pass",
+      "Next": "ChurnTransform"
+    },
+    "ChurnTransform": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sagemaker:createTransformJob",
+      "Parameters": {
+        "ModelName.$": "$.SageMakerTransform.ModelName",
+        "TransformInput": {
+          "CompressionType": "None",
+          "ContentType": "text/csv",
+          "DataSource": {
+            "S3DataSource": {
+              "S3DataType": "S3Prefix",
+              "S3Uri.$": "$.S3Input.URI"
+            }
+          }
+        },
+        "TransformOutput": {
+          "S3OutputPath.$": "$.S3Output.Path"
+        },
+        "TransformResources": {
+          "InstanceCount": 1,
+          "InstanceType": "ml.m5.large"
+        },
+        "TransformJobName.$": "$.SageMakerTransform.JobName"
+      },
+      "ResultPath": "$.TransformInfo",
+      "OutputPath": "$",
+      "Retry" : [
+        {
+          "ErrorEquals": [ "States.Timeout", "States.TaskFailed"],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "TimeoutSeconds": 600,
+      "Next": "Wait"
+    },
+    "Wait": {
+      "Type": "Wait",
+      "Seconds": 30,
+      "Next":"QueryTransformJobStatus",
+      "OutputPath": "$"
+    },
+    "QueryTransformJobStatus": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-west-2:883624334343:function:query_transform_status",
+      "InputPath": "$.TransformInfo",
+      "ResultPath": "$.QueryResponse",
+      "OutputPath": "$",
+      "Retry" : [
+        {
+          "ErrorEquals": [ "States.Timeout", "States.TaskFailed"],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "TimeoutSeconds": 600,
+      "Next": "TransformStatusChoice"
+    },
+    "TransformStatusChoice": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.QueryResponse.transformResponse",
+          "StringEquals": "Completed",
+          "Next": "IdentifyNewChurners"
+        },
+        {
+          "Variable": "$.QueryResponse.transformResponse",
+          "StringEquals": "InProgress",
+          "Next": "Wait"
+        }
+      ],
+      "OutputPath": "$",
+      "Default": "ChoiceFail"
+    },
+    "ChoiceFail":{
+     "Type": "Task",
+     "Resource": "arn:aws:states:::sns:publish",
+     "Parameters": {
+       "TopicArn.$": "$.SNS.TopicARN",
+       "Subject.$": "$.SNS.Subject",
+       "Message.$": "$.SNS.Message"
+       },
+     "Retry" : [
+        {
+          "ErrorEquals": [ "States.Timeout", "States.TaskFailed"],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+     "TimeoutSeconds": 600,
+     "End": true
+    },
+    "IdentifyNewChurners":{
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-west-2:883624334343:function:identify_new_churners",
+      "InputPath": "$.S3Output",
+      "ResultPath": "$.NewChurners",
+      "Retry" : [
+        {
+          "ErrorEquals": [ "States.Timeout", "States.TaskFailed"],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "TimeoutSeconds": 600,
+      "Next": "RetrieveCID"
+    },
+    "RetrieveCID":{
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:us-west-2:883624334343:function:retrieve_cid",
+      "Parameters": {
+        "CustomerID.$": "$.CustomerID",
+        "Churners.$": "$.NewChurners.churners"
+      },
+      "Retry" : [
+        {
+          "ErrorEquals": [ "States.Timeout", "States.TaskFailed"],
+          "IntervalSeconds": 3,
+          "MaxAttempts": 3,
+          "BackoffRate": 2
+        }
+      ],
+      "TimeoutSeconds": 600,
+      "End": true
+    }
+  }
+}
