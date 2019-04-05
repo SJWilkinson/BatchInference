@@ -2,7 +2,7 @@
   "StartAt": "PreProcessData",
   "States": {
     "PreProcessData": {
-      "Comment": "Collect data and preprocess input data.",
+      "Comment": "Aggregate and preprocess new data.",
       "Type": "Pass",
       "Next": "ChurnTransform"
     },

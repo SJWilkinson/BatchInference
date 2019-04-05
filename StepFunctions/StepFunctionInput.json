@@ -1,8 +1,25 @@
 {
-  "JobName": "xg-boost-churn-transform",
-  "CustomerID":{
-    "Bucket": "customer-churn-bucket",
-    "Key": "/sagemaker/DEMO-xgboost-churn/CID/test_data.csv"
+  "SageMakerTransform": {
+    "JobName": "",
+    "ModelName": ""
   },
-  "S3OutputPath": "s3://customer-churn-bucket/TransformJobOutputPath/Test.csv"
+  "S3Input": {
+    "URI": "",
+    "Bucket": "",
+    "Key": ""
+  },
+  "S3Output": {
+    "Path": "",
+    "Bucket": "",
+    "Key": ""
+  },
+  "CustomerID": {
+    "Bucket": "",
+    "Key": ""
+  },
+  "SNS": {
+    "TopicARN": "",
+    "Subject": "",
+    "Message": ""
+  }
 }
