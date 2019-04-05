@@ -5,15 +5,16 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 sm_client = boto3.client('sagemaker')
 
+#Retrieve transform job name from event and return transform job status.
 def lambda_handler(event, context):
 
     #From the transform ARN, retrieve the job name of the transform. This will
     #be used to query the job status.
-    print(event)
     if 'TransformJobArn' in event:
         transform_arn = event['TransformJobArn']
 
         #Retrieve transform job name from transform ARN
+        #Transform job name follows 'transform_job/' string in ARN
         job_name = transform_arn.rsplit(sep='transform-job/', maxsplit=1)[-1]
     else:
         raise KeyError('TransformJobArn key not found in input! Input to Step' +
@@ -28,8 +29,7 @@ def lambda_handler(event, context):
     except Exception as e:
         response = 'Failed to read transform status!'
         print(e)
-        print('Error querying the status of SageMaker transform' +
-            'job name: {}! Check the name of the job.'.format(job_name))
+        print(response +' Attempted to read job name: {}'.format(job_name))
 
     return {
         'statusCode': 200,
